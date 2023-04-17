@@ -22,9 +22,10 @@ int main () {
     Define Solution vectors U,V and P 
 
     /* U and V are solved each timestep as tridiagonal matrices*/
-    /*Generate the tridiagonal vectors for U and V*/
-    genUCoeffs(U,mu,rho, dT)
-    genVCoeffs (V,mu,rho,dT)
+    /*Two different TDM equations solved for each - along X and along Y*/
+    /*Generate the tridiagonal vectors along X and along Y*/
+    genXCoeffs(U,mu,rho, dT)
+    genYCoeffs (V,mu,rho,dT)
 
     /*Pressure is solved using sparse matrices*/
     /*The coefficients are defined using a CSR representation*/
@@ -47,10 +48,22 @@ int main () {
         /* RHS = [1/2  [3* H_u - H_u (at previous timestep)] + (D_u + D_v)/2] *dT */        
         updateRHS (H_u_n_1, H_v_n_1, H_u_n, H_v_n, D_u_n, D_v_n, RHS_u_n, RHs_v_n )
 
-        /* Solve the tridiagonal system of equations for velocity*/
+        /*Solve for velocities using TDMA*/
+
+        /* Stp 1- Solve the tridiagonal system of equations for velocity along X*/
         TriDiagSolve (U_low, U_diag, U_high, RHS_u, U )     //Solve for U 
-        XtoY (RHS_v,V_low, V_high, V_diag)   //Convert RHS_v to row-based ordeing to make soln tridiag
         TriDiagSolve (V_low, V_diag, V_high, RHS_v, V )    //Solve for V
+
+        /*Step 2- Reorder the vectors to make it TDM solvable along Y*/
+        XtoY (RHS_u,U_low, U_high, U_diag)   //Convert RHS_v to row-based ordeing to make soln tridiag
+        XtoY (RHS_v,V_low, V_high, V_diag) 
+
+        /*Step 3 -  Solve the tridiagonal system of equations for velocity along X*/        
+        TriDiagSolve (U_low, U_diag, U_high, RHS_u, U )     //Solve for U 
+        TriDiagSolve (V_low, V_diag, V_high, RHS_v, V )    //Solve for V
+
+        /Step 4 - *Reorder back to column-major order
+        YtoX (U)  // Convert V back to col-based ordering
         YtoX (V)  // Convert V back to col-based ordering
 
         /*Update the RHS for pressure using updated uncorrected velocity
