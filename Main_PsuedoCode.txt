@@ -1,0 +1,69 @@
+#include <Mesh.h>
+#Include <Solve.h>
+
+
+/* Psuedocode for the overall CFD algorithm
+* Asks the user for inputs for length of domain in x and y direction
+* number of grid points in x and y direction [Nx and Ny]
+* and fluid properties [ viscosity [mu] and density [rho]]
+*/
+
+int main () {
+
+    Ask inputs for Lx,Ly, Nx, Ny on terminal
+    Ask inputs for mu, rho from terminal
+
+    Define dT //Timestep for calculations
+
+    /*Create the mesh*/
+    Mesh (Nx,Ny,Lx,Ly, Domain)
+
+    /*Initialize all the variables*/
+    Define Solution vectors U,V and P 
+
+    /* U and V are solved each timestep as tridiagonal matrices*/
+    /*Generate the tridiagonal vectors for U and V*/
+    genUCoeffs(U,mu,rho, dT)
+    genVCoeffs (V,mu,rho,dT)
+
+    /*Pressure is solved using sparse matrices*/
+    /*The coefficients are defined using a CSR representation*/
+    /*Generate the coefficient matrix for P*/
+    getPcoeffs (P_rowPtr, P_colPtr, P_val, mu, rho, dT)
+
+    /*Solve*/
+
+    for t = 0; t< finalTime; t+dT
+
+        /*Calculate convective terms*/
+        calcH (U,V,U, Domain, H_u, Nx*Ny, Nx)   //Convection for U
+        calcH (U,V,V, Domain, H_v, Nx*Ny, Nx)   //Convection for V
+
+        /*Calculate diffusive terms*/
+        calcD (U, D, Domain, Ny*Nx, 'U', dT, mu, rho)  //Diffusion RHS for U
+        calcD (V, D, Domain, Ny*Nx, 'V', dT, mu, rho)  // Diffusion RHS for V
+
+        /*Update the RHS by adding diffusive and convective terms*/
+        /* RHS = [1/2  [3* H_u - H_u (at previous timestep)] + (D_u + D_v)/2] *dT */        
+        updateRHS (H_u_n_1, H_v_n_1, H_u_n, H_v_n, D_u_n, D_v_n, RHS_u_n, RHs_v_n )
+
+        /* Solve the tridiagonal system of equations for velocity*/
+        TriDiagSolve (U_low, U_diag, U_high, RHS_u, U )     //Solve for U 
+        XtoY (RHS_v,V_low, V_high, V_diag)   //Convert RHS_v to row-based ordeing to make soln tridiag
+        TriDiagSolve (V_low, V_diag, V_high, RHS_v, V )    //Solve for V
+        YtoX (V)  // Convert V back to col-based ordering
+
+        /*Update the RHS for pressure using updated uncorrected velocity
+        update_PRHS (U,V,P)
+
+        /*Solve for pressure using using sparse matrices*/
+        LinearSOlve (P_rowPtr, P_colPtr, P_val, P_RHS)
+
+        /*Correct for velocity using updated pressure values*/
+        velPressureCorrection (P,U,V)
+
+        /*Advance the timestep - update current time values to previous
+        H_u_n_1 = H_u_n
+        H_v_n_1 = H_v_n
+
+}
